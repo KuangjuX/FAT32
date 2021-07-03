@@ -1,2 +1,6 @@
 # FAT32
-FAT32 File System in Rust
+## Introduction
+FAT32 File System in Rust.
+
+## References
+- [fat32](https://github.com/Spxg/fat32)
