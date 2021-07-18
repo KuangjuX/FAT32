@@ -1,6 +1,19 @@
+/// BIOSParameterBlock Offset
+pub enum BPBOffset {
+    BytesPerSector = 11,
+    SectorsPerCluster = 13,
+    ReservedSectorCount = 14,
+    FatNums = 16, 
+    TotalSector32 = 32,
+    FatSize32 = 36,
+    RootSector = 44,
+    VolumeID = 67,
+    VolumeLabel = 71,
+    FileSystemType = 8
+}
+
 /// Define BIOS Parameters
 #[derive(Debug, Copy, Clone)]
-#[repr(C)]
 pub struct BIOSParameterBlock {
     pub byte_per_sector: u16,
     pub sector_per_cluster: u8,
