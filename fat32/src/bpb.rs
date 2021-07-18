@@ -1,49 +1,62 @@
-#[derive(Default, Debug, Clone)]
-pub struct BiosParameterBlock {
-    pub(crate) bytes_per_sector: u16,
-    pub(crate) sectors_per_cluster: u16,
-    pub(crate) reversed_sector: u16,
-    pub(crate) fats: u8,
-    pub(crate) root_entries: u16,
-    pub(crate) total_sectors_16: u16,
-    pub(crate) media: u8,
-    pub(crate) sectors_per_fat_16: u16,
-    pub(crate) sectors_per_track: u16,
-    pub(crate) heads: u16,
-    pub(crate) hidden_sectors: u32,
-    pub(crate) total_sectors_32: u32,
-
-    // Extended BIOS Paramter Block
-    pub(crate) sectors_per_fat_32: u32,
-    pub(crate) extended_flags: u16,
-    pub(crate) fs_version: u16,
-    pub(crate) root_dir_first_cluster: u32,
-    pub(crate) fs_info_sector: u16,
-    pub(crate) backup_boot_sector: u16,
-    pub(crate) reserved_0: [u8;12],
-    pub(crate) drive_num: u8,
-    pub(crate) ext_sig: u8,
-    pub(crate) volume_id: u32,
-    pub(crate) volume_label: [u8;11],
-    pub(crate) fs_type_label: [u8;8]
+/// Define BIOS Parameters
+#[derive(Debug, Copy, Clone)]
+#[repr(C)]
+pub struct BIOSParameterBlock {
+    pub byte_per_sector: u16,
+    pub sector_per_cluster: u8,
+    pub reserved_sector: u16,
+    pub num_fat: u8,
+    pub total_sector: u32,
+    pub sector_per_fat: u32,
+    pub root_cluster: u32,
+    pub id: u32,
+    pub volume_label: [u8; 11],
+    pub file_system: [u8; 8],
 }
 
-impl BiosParameterBlock {
-    /// Get the first sector offset bytes of the cluster from the cluster number
-    pub(crate) fn offset(&self, cluster: u32) -> usize {
-        ((self.reversed_sector as usize)
-        + (self.fats as usize) * (self.sectors_per_fat_32 as usize)
-        + (cluster as usize - 2) * (self.sectors_per_cluster as usize))
-        * (self.bytes_per_sector as usize)
+impl BIOSParameterBlock {
+    /// Uninit
+    pub fn uninit() -> Self {
+        Self {
+            byte_per_sector: 0,
+            sector_per_cluster: 0,
+            reserved_sector: 0,
+            num_fat: 0,
+            total_sector: 0,
+            sector_per_fat: 0,
+            root_cluster: 0,
+            id: 0,
+            volume_label: [0; 11],
+            file_system: [0; 8]
+        }
     }
 
-    /// Get fat1 offset
-    pub(crate) fn fat1(&self) -> usize {
-        (self.reversed_sector as usize) * (self.bytes_per_sector as usize)
+    /// Get the first sector offset bytes of the cluster from the cluster number
+    pub fn offset(&self, cluster: u32) -> usize {
+        ((self.reserved_sector as usize)
+            + (self.num_fat as usize) * (self.sector_per_fat as usize)
+            + (cluster as usize - 2) * (self.sector_per_cluster as usize))
+            * (self.byte_per_sector as usize)
+    }
+
+    /// Get FAT1 Offset
+    pub fn fat1(&self) -> usize {
+        (self.reserved_sector as usize) * (self.byte_per_sector as usize)
     }
 
     /// Get sector_per_cluster_usize as usize value
-    pub(crate) fn sector_per_cluster_size(&self) -> usize {
-        self.sectors_per_cluster as usize
+    pub fn sector_per_cluster_usize(&self) -> usize {
+        self.sector_per_cluster as usize
+    }
+
+    /// Get the numbers of data clusters
+    pub fn data_sectors(&self) -> usize {
+        (self.total_sector - (self.reserved_sector as u32 + (self.num_fat as u32 * self.sector_per_fat) 
+        + self.root_cluster)) as usize
+    }
+
+    /// Get the count 
+    pub fn count_of_clusters(&self) -> usize {
+        self.data_sectors() / self.sector_per_cluster as usize
     }
 }

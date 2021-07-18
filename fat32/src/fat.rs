@@ -1,61 +1,55 @@
-use super::device::BlockDevice;
-use super::BUFFER_SIZE;
-use super::utils::read_le_u32;
+use super::BlockDevice;
+use crate::BUFFER_SIZE;
+use crate::tool::read_le_u32;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
 pub struct FAT<T>
-    where T: BlockDevice + Clone + Copy,
+    where T: BlockDevice + Clone,
 {
     device: T,
     fat_offset: usize,
-    start_cluster: u32, 
+    start_cluster: u32,
     previous_cluster: u32,
     pub(crate) current_cluster: u32,
     next_cluster: Option<u32>,
-    buffer: [u8;BUFFER_SIZE]
+    buffer: [u8; BUFFER_SIZE],
 }
 
-
 impl<T> FAT<T>
-    where T: BlockDevice + Clone + Copy
+    where T: BlockDevice + Clone,
 {
-    pub(crate) fn new(cluster: u32, device: T, fat_offset: usize) -> Self {
+    pub fn new(cluster: u32, device: T, fat_offset: usize) -> Self {
         Self {
             device,
             fat_offset,
-            start_cluster:cluster,
+            start_cluster: cluster,
             previous_cluster: 0,
             current_cluster: 0,
             next_cluster: None,
-            buffer: [0; BUFFER_SIZE]
+            buffer: [0; BUFFER_SIZE],
         }
     }
-
 
     pub(crate) fn blank_cluster(&mut self) -> u32 {
         let mut cluster = 0;
         let mut done = false;
 
         for block in 0.. {
-            self.device.read(
-                self.fat_offset + block * BUFFER_SIZE,
-                &mut self.buffer,
-                1
-            );
+            self.device.read(&mut self.buffer,
+                             self.fat_offset + block * BUFFER_SIZE,
+                             1);
             for i in (0..BUFFER_SIZE).step_by(4) {
-                if read_le_u32(&self.buffer[i..i+4]) == 0 {
+                if read_le_u32(&self.buffer[i..i + 4]) == 0 {
                     done = true;
                     break;
-                }else {
-                    cluster += 1;
-                }
+                } else { cluster += 1; }
             }
-            if done { break };
+            if done { break; }
         }
         cluster
     }
 
-    pub(crate) fn write(&mut self, cluster: u32, value: u32) {
+    pub fn write(&mut self, cluster: u32, value: u32) {
         let offset = (cluster as usize) * 4;
         let block_offset = offset / BUFFER_SIZE;
         let offset_left = offset % BUFFER_SIZE;
@@ -63,17 +57,13 @@ impl<T> FAT<T>
         let mut value: [u8; 4] = value.to_be_bytes();
         value.reverse();
 
-        self.device.read(
-            offset, 
-            &mut self.buffer,
-             1
-            );
-        self.buffer[offset_left..offset + 4].copy_from_slice(&value);
-        self.device.write(
-            offset, 
-            &self.buffer, 
-            1
-        );
+        self.device.read(&mut self.buffer,
+                         offset,
+                         1);
+        self.buffer[offset_left..offset_left + 4].copy_from_slice(&value);
+        self.device.write(&self.buffer,
+                          offset,
+                          1);
     }
 
     pub(crate) fn refresh(&mut self, start_cluster: u32) {
@@ -92,26 +82,26 @@ impl<T> FAT<T>
         self.next_cluster.is_none()
     }
 
-    pub(crate) fn current_cluster_usize(&self) -> usize {
+    fn current_cluster_usize(&self) -> usize {
         self.current_cluster as usize
     }
 }
 
 impl<T> Iterator for FAT<T>
-    where T: BlockDevice + Clone + Copy
+    where T: BlockDevice + Clone,
 {
     type Item = Self;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_cluster == 0 {
             self.current_cluster = self.start_cluster;
-        }else {
+        } else {
             let next_cluster = self.next_cluster;
             if next_cluster.is_some() {
                 self.previous_cluster = self.current_cluster;
                 self.current_cluster = next_cluster.unwrap();
-            }else {
-                return None
+            } else {
+                return None;
             }
         }
 
@@ -119,24 +109,27 @@ impl<T> Iterator for FAT<T>
         let block_offset = offset / BUFFER_SIZE;
         let offset_left = offset % BUFFER_SIZE;
 
-        self.device.read(
-            self.fat_offset + block_offset * BUFFER_SIZE,
-            &mut self.buffer,
-            1
-        );
+        self.device.read(&mut self.buffer,
+                         self.fat_offset + block_offset * BUFFER_SIZE,
+                         1);
 
         let next_cluster = read_le_u32(&self.buffer[offset_left..offset_left + 4]);
         let next_cluster = if next_cluster == 0x0FFFFFFF {
             None
-        }else {
+        } else {
             Some(next_cluster)
         };
 
         self.next_cluster = next_cluster;
 
-        Some(Self{
+        Some(Self {
             next_cluster,
-            ..(*self)
+            device: self.device.clone(),
+            fat_offset: self.fat_offset,
+            start_cluster: self.start_cluster,
+            previous_cluster: self.previous_cluster,
+            current_cluster: self.current_cluster,
+            buffer: self.buffer,
         })
     }
 }

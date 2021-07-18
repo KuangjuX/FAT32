@@ -1,9 +1,29 @@
 [package]
 name = "fat32"
-version = "0.1.0"
-authors = ["KuangjuX <qcx@tju.edu.cn>"]
+version = "0.2.1"
+authors = ["spxg <itsme@unsafe.me>"]
 edition = "2018"
+description = "FAT32 FileSystem Library"
+keywords = ["sdcard", "fat", "embedded", "stm32f407", "filesystem"]
+categories = ["embedded", "no-std"]
+repository = "https://github.com/Spxg/fat32"
+readme = "README.md"
+license = "MIT"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[target.'cfg(windows)'.dev-dependencies.winapi]
+version = "0.3"
+features = ["fileapi", "winioctl", "ioapiset"]
 
 [dependencies]
+block_device = "0.1"
+
+[features]
+default = ["512"]
+512 = []
+1024 = []
+2048 = []
+4096 = []
+8192 = []
+16384 = []
+32768 = []
+65536 = []

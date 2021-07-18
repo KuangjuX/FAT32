@@ -1,4 +1,4 @@
-pub trait BlockDevice: Send + Send + 'static {
-    fn read(&self, addr: usize, buf: &mut [u8], number_of_block: usize);
-    fn write(&self, addr: usize, buf: &[u8], number_of_block: usize);
+pub trait BlockDevice {
+    fn read(&self, buf: &mut [u8], addr: usize, block_number: usize);
+    fn write(&self, buf: &[u8], addr: usize, block_number: usize);
 }
