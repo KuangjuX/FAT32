@@ -51,14 +51,14 @@ impl<T> Volume<T>
         Volume::<T> {
             device,
             bpb: BIOSParameterBlock {
-                byte_per_sector: bps,
-                sector_per_cluster: buf[0x0D],
+                bytes_per_sector: bps,
+                sectors_per_cluster: buf[0x0D],
                 reserved_sector: read_le_u16(&buf[0x0E..0x10]),
                 num_fat: buf[0x10],
                 total_sector: read_le_u32(&buf[0x20..0x24]),
-                sector_per_fat: read_le_u32(&buf[0x24..0x28]),
+                sectors_per_fat: read_le_u32(&buf[0x24..0x28]),
                 root_cluster: read_le_u32(&buf[0x2C..0x30]),
-                id: read_le_u32(&buf[0x43..0x47]),
+                volume_id: read_le_u32(&buf[0x43..0x47]),
                 volume_label,
                 file_system,
             },
@@ -89,14 +89,14 @@ impl<T> Debug for Volume<T>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("Volume")
-            .field("byte_per_sector", &self.bpb.byte_per_sector)
-            .field("sector_per_cluster", &self.bpb.sector_per_cluster)
+            .field("byte_per_sector", &self.bpb.bytes_per_sector)
+            .field("sector_per_cluster", &self.bpb.sectors_per_cluster)
             .field("reserved_sector", &self.bpb.reserved_sector)
             .field("num_fat", &self.bpb.num_fat)
             .field("total_sector", &self.bpb.total_sector)
-            .field("sector_per_fat", &self.bpb.sector_per_fat)
+            .field("sector_per_fat", &self.bpb.sectors_per_fat)
             .field("root_cluster", &self.bpb.root_cluster)
-            .field("id", &self.bpb.id)
+            .field("id", &self.bpb.volume_id)
             .field("volume_label", &self.volume_label().trim())
             .field("file_system", &"FAT32")
             .finish()
