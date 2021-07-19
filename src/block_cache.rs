@@ -3,6 +3,7 @@ use super::BlockDevice;
 
 use alloc::sync::Arc;
 use alloc::collections::VecDeque;
+use core::ptr;
 
 use spin::Mutex;
 use lazy_static::*;
@@ -61,6 +62,24 @@ impl BlockCache {
         if self.modified {
             self.modified = false;
             self.block_device.write(self.block_id, &self.cache);
+        }
+    }
+
+    pub fn get_cache(&self) -> &[u8] {
+        &self.cache
+    }
+
+    pub fn get_cache_mut(&mut self) -> &mut [u8] {
+        &mut self.cache
+    }
+
+    pub fn split(&self, start: usize, end: usize) -> &[u8] {
+        &(self.get_cache())[start..end]
+    }
+
+    pub fn write_cache(&self, buf: &[u8]) {
+        unsafe{
+            ptr::copy(buf.as_ptr(), self.cache.as_mut_ptr(), BUFFER_SIZE);
         }
     }
 }

@@ -17,6 +17,7 @@ pub use device::BlockDevice;
 pub use bpb::BIOSParameterBlock;
 pub use tool::{ reverse_u16, reverse_u32 };
 pub use fat::FAT;
+pub use block_cache::{ BLOCK_CACHE_MANAGER, BlockCache, get_block_cache };
 
 
 #[cfg(test)]

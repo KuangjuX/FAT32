@@ -1,12 +1,16 @@
 use super::BlockDevice;
-use crate::BUFFER_SIZE;
+use crate::{BUFFER_SIZE, get_block_cache};
 use crate::tool::read_le_u32;
 
-#[derive(Debug, Copy, Clone)]
-pub struct FAT<T>
-    where T: BlockDevice + Clone,
-{
+use alloc::sync::Arc;
+
+use core::ptr;
+
+pub struct FAT {
+    block_device: Arc<dyn BlockDevice>,
     fat_offset: usize,
+    bytes_per_sector: u16,
+    sectors_per_cluster:u8,
     start_cluster: u32,
     previous_cluster: u32,
     pub(crate) current_cluster: u32,
@@ -15,9 +19,12 @@ pub struct FAT<T>
 }
 
 impl FAT {
-    pub fn new(cluster: u32, fat_offset: usize) -> Self {
+    pub fn new(cluster: u32, fat_offset: usize, block_device: Arc<dyn BlockDevice>) -> Self {
         Self {
+            block_device,
             fat_offset,
+            bytes_per_sector: 0,
+            sectors_per_cluster: 1,
             start_cluster: cluster,
             previous_cluster: 0,
             current_cluster: 0,
@@ -29,19 +36,24 @@ impl FAT {
     pub(crate) fn blank_cluster(&mut self) -> u32 {
         let mut cluster = 0;
         let mut done = false;
-
-        for block in 0.. {
-            self.device.read(&mut self.buffer,
-                             self.fat_offset + block * BUFFER_SIZE,
-                             1);
+        let count_block_id: usize = 0;
+        let base_block_id = self.fat_offset/(self.bytes_per_sector as usize * self.sectors_per_cluster as usize);
+        loop {
+            let block_id = base_block_id + count_block_id;
+            let block_cache = unsafe{ get_block_cache(block_id, self.block_device) };
             for i in (0..BUFFER_SIZE).step_by(4) {
-                if read_le_u32(&self.buffer[i..i + 4]) == 0 {
+                if read_le_u32(block_cache.lock().split(i, i+4)) == 0 {
                     done = true;
                     break;
-                } else { cluster += 1; }
+                } else {
+                    cluster += 1;
+                }
+                if done {break};
             }
-            if done { break; }
+            count_block_id += 1;
+
         }
+
         cluster
     }
 
@@ -53,13 +65,15 @@ impl FAT {
         let mut value: [u8; 4] = value.to_be_bytes();
         value.reverse();
 
-        self.device.read(&mut self.buffer,
-                         offset,
-                         1);
-        self.buffer[offset_left..offset_left + 4].copy_from_slice(&value);
-        self.device.write(&self.buffer,
-                          offset,
-                          1);
+
+        let block_cache = unsafe{ get_block_cache(block_offset, self.block_device).lock() };
+        let cache = block_cache.get_cache_mut();
+        cache[offset_left..offset + 4].copy_from_slice(&value);
+        // Write Cache
+        block_cache.write_cache(cache);
+        // Write back Disk
+        drop(block_cache);
+        
     }
 
     pub(crate) fn refresh(&mut self, start_cluster: u32) {
@@ -83,8 +97,7 @@ impl FAT {
     }
 }
 
-impl<T> Iterator for FAT<T>
-    where T: BlockDevice + Clone,
+impl Iterator for FAT
 {
     type Item = Self;
 
@@ -105,9 +118,20 @@ impl<T> Iterator for FAT<T>
         let block_offset = offset / BUFFER_SIZE;
         let offset_left = offset % BUFFER_SIZE;
 
-        self.device.read(&mut self.buffer,
-                         self.fat_offset + block_offset * BUFFER_SIZE,
-                         1);
+        // self.device.read(&mut self.buffer,
+        //                  self.fat_offset + block_offset * BUFFER_SIZE,
+        //                  1);
+        let block_id = self.fat_offset/BUFFER_SIZE + block_offset;
+        let block_cache = unsafe{
+             get_block_cache(block_id, self.block_device) 
+             .lock()
+            };
+        let cache = block_cache.get_cache();
+        // Copy FAT Buffer into self.buffer
+        unsafe{
+            ptr::copy(cache.as_ptr(), self.buffer.as_mut_ptr(), BUFFER_SIZE);
+        }
+        
 
         let next_cluster = read_le_u32(&self.buffer[offset_left..offset_left + 4]);
         let next_cluster = if next_cluster == 0x0FFFFFFF {
@@ -120,8 +144,10 @@ impl<T> Iterator for FAT<T>
 
         Some(Self {
             next_cluster,
-            device: self.device.clone(),
+            block_device: self.block_device,
             fat_offset: self.fat_offset,
+            bytes_per_sector: self.bytes_per_sector,
+            sectors_per_cluster: self.se,
             start_cluster: self.start_cluster,
             previous_cluster: self.previous_cluster,
             current_cluster: self.current_cluster,
