@@ -6,7 +6,6 @@ use crate::tool::read_le_u32;
 pub struct FAT<T>
     where T: BlockDevice + Clone,
 {
-    device: T,
     fat_offset: usize,
     start_cluster: u32,
     previous_cluster: u32,
@@ -15,12 +14,9 @@ pub struct FAT<T>
     buffer: [u8; BUFFER_SIZE],
 }
 
-impl<T> FAT<T>
-    where T: BlockDevice + Clone,
-{
-    pub fn new(cluster: u32, device: T, fat_offset: usize) -> Self {
+impl FAT {
+    pub fn new(cluster: u32, fat_offset: usize) -> Self {
         Self {
-            device,
             fat_offset,
             start_cluster: cluster,
             previous_cluster: 0,

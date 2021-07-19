@@ -7,23 +7,11 @@ pub mod entry;
 pub mod file;
 pub mod fat;
 pub mod device;
+pub mod block_cache;
 
-#[cfg(feature = "512")]
+extern crate alloc;
+
 const BUFFER_SIZE: usize = 512;
-#[cfg(feature = "1024")]
-const BUFFER_SIZE: usize = 1024;
-#[cfg(feature = "2048")]
-const BUFFER_SIZE: usize = 2048;
-#[cfg(feature = "4096")]
-const BUFFER_SIZE: usize = 4096;
-#[cfg(feature = "8192")]
-const BUFFER_SIZE: usize = 8192;
-#[cfg(feature = "16384")]
-const BUFFER_SIZE: usize = 16384;
-#[cfg(feature = "32768")]
-const BUFFER_SIZE: usize = 32768;
-#[cfg(feature = "65536")]
-const BUFFER_SIZE: usize = 65536;
 
 pub use device::BlockDevice;
 pub use bpb::BIOSParameterBlock;

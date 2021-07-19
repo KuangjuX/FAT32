@@ -219,7 +219,7 @@ impl BIOSParameterBlock {
 
     /// Get the numbers of data clusters
     pub fn data_sectors(&self) -> usize {
-        (self.total_sector - (self.reserved_sector as u32 + (self.num_fat as u32 * self.sector_per_fat) 
+        (self.total_sector - (self.reserved_sector as u32 + (self.num_fat as u32 * self.sectors_per_fat) 
         + self.root_cluster)) as usize
     }
 
