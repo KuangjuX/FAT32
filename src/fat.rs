@@ -7,15 +7,15 @@ use alloc::sync::Arc;
 use core::ptr;
 
 pub struct FAT {
-    block_device: Arc<dyn BlockDevice>,
-    fat_offset: usize,
-    bytes_per_sector: u16,
-    sectors_per_cluster:u8,
-    start_cluster: u32,
-    previous_cluster: u32,
-    pub(crate) current_cluster: u32,
-    next_cluster: Option<u32>,
-    buffer: [u8; BUFFER_SIZE],
+    pub block_device: Arc<dyn BlockDevice>,
+    pub fat_offset: usize,
+    pub bytes_per_sector: u16,
+    pub sectors_per_cluster:u8,
+    pub start_cluster: u32,
+    pub previous_cluster: u32,
+    pub current_cluster: u32,
+    pub next_cluster: Option<u32>,
+    pub buffer: [u8; BUFFER_SIZE],
 }
 
 impl FAT {
@@ -36,11 +36,14 @@ impl FAT {
     pub(crate) fn blank_cluster(&mut self) -> u32 {
         let mut cluster = 0;
         let mut done = false;
-        let count_block_id: usize = 0;
+        let mut count_block_id: usize = 0;
         let base_block_id = self.fat_offset/(self.bytes_per_sector as usize * self.sectors_per_cluster as usize);
         loop {
             let block_id = base_block_id + count_block_id;
-            let block_cache = unsafe{ get_block_cache(block_id, self.block_device) };
+            let block_cache = get_block_cache(
+                block_id, 
+                self.block_device.clone()
+            );
             for i in (0..BUFFER_SIZE).step_by(4) {
                 if read_le_u32(block_cache.lock().split(i, i+4)) == 0 {
                     done = true;
@@ -66,13 +69,15 @@ impl FAT {
         value.reverse();
 
 
-        let block_cache = unsafe{ get_block_cache(block_offset, self.block_device).lock() };
-        let cache = block_cache.get_cache_mut();
+        let block_cache = get_block_cache(
+            block_offset, 
+            self.block_device.clone()
+        );
+        let mut block_cache_guard = block_cache.lock();
+        let cache = block_cache_guard.get_cache_mut();
         cache[offset_left..offset + 4].copy_from_slice(&value);
-        // Write Cache
-        block_cache.write_cache(cache);
         // Write back Disk
-        drop(block_cache);
+        drop(block_cache_guard);
         
     }
 
@@ -122,11 +127,12 @@ impl Iterator for FAT
         //                  self.fat_offset + block_offset * BUFFER_SIZE,
         //                  1);
         let block_id = self.fat_offset/BUFFER_SIZE + block_offset;
-        let block_cache = unsafe{
-             get_block_cache(block_id, self.block_device) 
-             .lock()
-            };
-        let cache = block_cache.get_cache();
+        let block_cache = get_block_cache(
+            block_id, 
+            self.block_device.clone()
+        );
+        let block_cache_guard = block_cache.lock();
+        let cache = block_cache_guard.get_cache();
         // Copy FAT Buffer into self.buffer
         unsafe{
             ptr::copy(cache.as_ptr(), self.buffer.as_mut_ptr(), BUFFER_SIZE);
@@ -144,7 +150,7 @@ impl Iterator for FAT
 
         Some(Self {
             next_cluster,
-            block_device: self.block_device,
+            block_device: self.block_device.clone(),
             fat_offset: self.fat_offset,
             bytes_per_sector: self.bytes_per_sector,
             sectors_per_cluster: self.sectors_per_cluster,

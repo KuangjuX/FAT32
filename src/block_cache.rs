@@ -79,7 +79,7 @@ impl BlockCache {
 
     pub fn write_cache(&self, buf: &[u8]) {
         unsafe{
-            ptr::copy(buf.as_ptr(), self.cache.as_mut_ptr(), BUFFER_SIZE);
+            ptr::copy(buf.as_ptr(), self.cache.as_ptr() as *mut u8, BUFFER_SIZE);
         }
     }
 }
@@ -138,6 +138,8 @@ lazy_static! {
         BlockCacheManager::new()
     );
 }
+
+unsafe impl Send for BlockCacheManager{}
 
 pub fn get_block_cache(
     block_id: usize,
