@@ -147,7 +147,7 @@ impl Iterator for FAT
             block_device: self.block_device,
             fat_offset: self.fat_offset,
             bytes_per_sector: self.bytes_per_sector,
-            sectors_per_cluster: self.se,
+            sectors_per_cluster: self.sectors_per_cluster,
             start_cluster: self.start_cluster,
             previous_cluster: self.previous_cluster,
             current_cluster: self.current_cluster,
