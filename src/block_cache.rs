@@ -1,18 +1,21 @@
-use super::BUFFER_SIZE;
-use super::BlockDevice;
-
-use alloc::sync::Arc;
+use super::{
+    BLOCK_SZ,
+    BlockDevice,
+};
 use alloc::collections::VecDeque;
-use core::ptr;
-
-use spin::Mutex;
+use alloc::sync::Arc;
 use lazy_static::*;
+use spin::RwLock;
+#[allow(unused)]
+// use riscv::register::time;
 
 pub struct BlockCache {
-    cache: [u8; BUFFER_SIZE],
+    pub cache: [u8; BLOCK_SZ],
     block_id: usize,
     block_device: Arc<dyn BlockDevice>,
-    modified: bool
+    modified: bool,
+    #[allow(unused)]
+    time_stamp: usize,
 }
 
 impl BlockCache {
@@ -21,13 +24,18 @@ impl BlockCache {
         block_id: usize, 
         block_device: Arc<dyn BlockDevice>
     ) -> Self {
-        let mut cache = [0u8; BUFFER_SIZE];
-        block_device.read(block_id, &mut cache);
+        let mut cache = [0u8; BLOCK_SZ];
+        //println!("cache new: blk_id = {}", block_id);
+        block_device.read_block(block_id, &mut cache);
+        // TODO: 时间戳
+        //let mut time_stamp = time::read();
+        let time_stamp = 0;
         Self {
             cache,
             block_id,
             block_device,
             modified: false,
+            time_stamp,
         }
     }
 
@@ -37,14 +45,14 @@ impl BlockCache {
 
     pub fn get_ref<T>(&self, offset: usize) -> &T where T: Sized {
         let type_size = core::mem::size_of::<T>();
-        assert!(offset + type_size <= BUFFER_SIZE);
+        assert!(offset + type_size <= BLOCK_SZ);
         let addr = self.addr_of_offset(offset);
         unsafe { &*(addr as *const T) } 
     }
 
     pub fn get_mut<T>(&mut self, offset: usize) -> &mut T where T: Sized {
         let type_size = core::mem::size_of::<T>();
-        assert!(offset + type_size <= BUFFER_SIZE);
+        assert!(offset + type_size <= BLOCK_SZ);
         self.modified = true;
         let addr = self.addr_of_offset(offset);
         unsafe { &mut *(addr as *mut T) }
@@ -60,26 +68,9 @@ impl BlockCache {
 
     pub fn sync(&mut self) {
         if self.modified {
+            //println!("drop cache, id = {}", self.block_id);
             self.modified = false;
-            self.block_device.write(self.block_id, &self.cache);
-        }
-    }
-
-    pub fn get_cache(&self) -> &[u8] {
-        &self.cache
-    }
-
-    pub fn get_cache_mut(&mut self) -> &mut [u8] {
-        &mut self.cache
-    }
-
-    pub fn split(&self, start: usize, end: usize) -> &[u8] {
-        &(self.get_cache())[start..end]
-    }
-
-    pub fn write_cache(&self, buf: &[u8]) {
-        unsafe{
-            ptr::copy(buf.as_ptr(), self.cache.as_ptr() as *mut u8, BUFFER_SIZE);
+            self.block_device.write_block(self.block_id, &self.cache);
         }
     }
 }
@@ -90,22 +81,54 @@ impl Drop for BlockCache {
     }
 }
 
-const BLOCK_CACHE_SIZE: usize = 16;
 
+// 0-info扇区
+// 1-2 FAT1
+// 3-4 FAT2
+// 5-7 DirEntry
+// 8-19 DATA
+
+const BLOCK_CACHE_SIZE: usize = 10;
+//const DIRENT_CACHE_SIZE: usize = 4;
 pub struct BlockCacheManager {
-    queue: VecDeque<(usize, Arc<Mutex<BlockCache>>)>,
+    start_sec: usize,
+    queue: VecDeque<(usize, Arc<RwLock<BlockCache>>)>,
 }
 
 impl BlockCacheManager {
     pub fn new() -> Self {
-        Self { queue: VecDeque::new() }
+        Self { 
+            start_sec: 0,
+            queue: VecDeque::new() 
+        }
+    }
+
+    pub fn set_start_sec(&mut self, new_start_sec: usize){
+        self.start_sec = new_start_sec;
+    }
+
+    pub fn get_start_sec(&self)->usize {
+        self.start_sec
+    }
+
+    pub fn read_block_cache(
+        &self,
+        block_id: usize,
+    ) -> Option<Arc<RwLock<BlockCache>>>{
+        if let Some(pair) = self.queue
+            .iter()
+            .find(|pair| pair.0 == block_id) {
+                Some(Arc::clone(&pair.1))
+        }else{
+            None
+        }
     }
 
     pub fn get_block_cache(
         &mut self,
         block_id: usize,
         block_device: Arc<dyn BlockDevice>,
-    ) -> Arc<Mutex<BlockCache>> {
+    ) -> Arc<RwLock<BlockCache>> {
         if let Some(pair) = self.queue
             .iter()
             .find(|pair| pair.0 == block_id) {
@@ -124,26 +147,107 @@ impl BlockCacheManager {
                 }
             }
             // load block into mem and push back
-            let block_cache = Arc::new(Mutex::new(
+            let block_cache = Arc::new(RwLock::new(
                 BlockCache::new(block_id, Arc::clone(&block_device))
             ));
             self.queue.push_back((block_id, Arc::clone(&block_cache)));
+            //println!("blkcache: {:?}", block_cache.read().cache);
             block_cache
         }
     }
+
+    pub fn drop_all(&mut self){
+        self.queue.clear();
+    }
 }
 
+
+
 lazy_static! {
-    pub static ref BLOCK_CACHE_MANAGER: Mutex<BlockCacheManager> = Mutex::new(
+    pub static ref DATA_BLOCK_CACHE_MANAGER: RwLock<BlockCacheManager> = RwLock::new(
         BlockCacheManager::new()
     );
 }
 
-unsafe impl Send for BlockCacheManager{}
+lazy_static! {
+    pub static ref INFO_CACHE_MANAGER: RwLock<BlockCacheManager> = RwLock::new(
+        BlockCacheManager::new()
+    );
+}
 
+#[derive(PartialEq,Copy,Clone,Debug)]
+pub enum CacheMode {
+    READ,
+    WRITE,
+}
+
+/* 仅用于访问文件数据块，不包括目录项 */
 pub fn get_block_cache(
+    block_id: usize,
+    block_device: Arc<dyn BlockDevice>,
+    rw_mode: CacheMode,
+) -> Arc<RwLock<BlockCache>> {
+    let phy_blk_id = DATA_BLOCK_CACHE_MANAGER.read().get_start_sec() + block_id;
+    if rw_mode == CacheMode::READ {
+        // make sure the blk is in cache
+        DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
+        DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
+    } else {
+        DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
+    }
+}
+
+/* 用于访问保留扇区，以及目录项 */
+pub fn get_info_cache(
+    block_id: usize,
+    block_device: Arc<dyn BlockDevice>,
+    rw_mode: CacheMode,
+) -> Arc<RwLock<BlockCache>> {
+    let phy_blk_id = INFO_CACHE_MANAGER.read().get_start_sec() + block_id;
+    if rw_mode == CacheMode::READ {
+        // make sure the blk is in cache
+        INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
+        INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
+    } else {
+        INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
+    }
+}
+
+pub fn set_start_sec(start_sec: usize){
+    INFO_CACHE_MANAGER.write().set_start_sec(start_sec);
+    DATA_BLOCK_CACHE_MANAGER.write().set_start_sec(start_sec);
+}
+
+pub fn write_to_dev(){  
+    INFO_CACHE_MANAGER.write().drop_all();
+    DATA_BLOCK_CACHE_MANAGER.write().drop_all();
+}   
+
+
+/* 
+pub fn get_dirent_block_cache(
     block_id: usize,
     block_device: Arc<dyn BlockDevice>
 ) -> Arc<Mutex<BlockCache>> {
-    BLOCK_CACHE_MANAGER.lock().get_block_cache(block_id, block_device)
+    DATA_BLOCK_CACHE_MANAGER.lock().get_block_cache(block_id, block_device)
 }
+*/
+
+
+/* 
+enum CacheType {
+    INFO,
+    FAT1,
+    FAT2,
+    DIRENT,
+    DATA,
+}
+fn type_to_range(type_: CacheType)->Range<usize>{
+    match type_ {
+        CacheType::INFO => {0..1}
+        CacheType::FAT1 => {1..3}
+        CacheType::FAT2 => {3..5}
+        CacheType::DIRENT => {5..8}
+        CacheType::DATA => {8..19}
+    }      
+}*/

@@ -1,14 +1,8 @@
 [package]
-name = "fat32"
-version = "0.2.1"
-authors = ["spxg <itsme@unsafe.me>"]
+name = "FAT32"
+version = "0.0.1"
+authors = ["KuangjuX <qcx@tju.edu.cn>"]
 edition = "2018"
-description = "FAT32 FileSystem Library"
-keywords = ["sdcard", "fat", "embedded", "stm32f407", "filesystem"]
-categories = ["embedded", "no-std"]
-repository = "https://github.com/Spxg/fat32"
-readme = "README.md"
-license = "MIT"
 
 [target.'cfg(windows)'.dev-dependencies.winapi]
 version = "0.3"
