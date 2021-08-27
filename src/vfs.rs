@@ -623,13 +623,22 @@ impl VFile{
     /* 获取目录中offset处目录项的信息 TODO:之后考虑和stat复用
     * 返回<size, atime, mtime, ctime>
     */
-    pub fn stat(&self)->( i64, i64, i64, i64 ){
+    pub fn stat(&self)->( i64, i64, i64, i64, u64 ){
         self.read_short_dirent(|sde:&ShortDirEntry|{
             let (_,_,_,_,_,_,ctime) = sde.get_creation_time();
             let (_,_,_,_,_,_,atime) = sde.get_accessed_time();
             let (_,_,_,_,_,_,mtime) = sde.get_modification_time();
-            let size = sde.get_size();
-            (size as i64, atime as i64, mtime as i64, ctime as i64)
+            let mut size = sde.get_size();
+            let first_clu = sde.first_cluster();
+            if self.is_dir() {
+                let fs_reader = self.fs.read();
+                let fat = fs_reader.get_fat();
+                let fat_reader = fat.read();
+                let cluster_num = fat_reader.count_claster_num( first_clu, self.block_device.clone());
+                size = cluster_num * fs_reader.bytes_per_cluster();
+                //println!("{} {}",cluster_num, fs_reader.bytes_per_cluster());
+            }
+            (size as i64, atime as i64, mtime as i64, ctime as i64, first_clu as u64)
         })
     }
     
