@@ -4,8 +4,8 @@ use super::{
     layout::*,
     get_info_cache,
     CacheMode,
-    println,
-    print
+    // println,
+    // print
 };
 use alloc::sync::Arc;
 use alloc::string::String;
@@ -314,7 +314,7 @@ impl VFile{
         let mut current_vfile = self.clone();
         for i in 0 .. len {
             // DEBUG
-            print!("\n");
+            // print!("\n");
             if path[i] == "" || path[i] == "."{
                 continue;
             }
@@ -745,7 +745,7 @@ impl VFile{
         let mut offset = 0;
         loop {
             if (offset/DIRENT_SZ)%5 == 0 {
-                print!("\n");
+                // print!("\n");
             }
             let mut tmp_dirent = ShortDirEntry::empty();
             let read_sz = self.read_short_dirent(|short_ent:&ShortDirEntry|{
