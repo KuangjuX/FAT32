@@ -326,25 +326,24 @@ impl VFile{
     }
 
     fn increase_size(
-        & self,
+        &self,
         new_size: u32,
-    ) {  // TODO: return sth when cannot increase
+    ) {  
+        // TODO: return sth when cannot increase
         //println!("===================== in increase =======================");
         //println!("file: {}, newsz = {}", self.get_name(), new_size);
         //println!("try lock");
         let first_cluster = self.first_cluster();
         let old_size = self.get_size();
         let manager_writer = self.fs.write();
-        //println!("get lock");
         if new_size <= old_size {
-            //println!("oldsz > newsz");
             return;
         }
+        // 获取现在需要多少cluster去增长size
         let needed = manager_writer.cluster_num_needed(old_size, new_size, self.is_dir(), first_cluster);
-        //println!("needed = {}", needed);
+        // println!("needed = {}", needed);
         if needed == 0{
             if !self.is_dir() {
-                //self.size = new_size;
                 self.modify_short_dirent(|se:&mut ShortDirEntry|{
                     se.set_size(new_size);
                 });
@@ -477,7 +476,7 @@ impl VFile{
 
 
     pub fn first_cluster(&self)->u32{
-        self.read_short_dirent(|se:& ShortDirEntry|{
+        self.read_short_dirent(|se:& ShortDirEntry| {
             se.first_cluster()
         })
     }
@@ -688,9 +687,9 @@ impl VFile{
         })
     }   
 
-    pub fn write_at(& self, offset: usize, buf: & [u8])->usize{
+    pub fn write_at(&self, offset: usize, buf: & [u8]) -> usize {
         self.increase_size((offset + buf.len()) as u32  );
-        self.modify_short_dirent(|short_ent: &mut ShortDirEntry|{
+        self.modify_short_dirent(|short_ent: &mut ShortDirEntry| {
             short_ent.write_at(
                 offset, 
                 buf, 

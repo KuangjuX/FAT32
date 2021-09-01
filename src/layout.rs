@@ -691,21 +691,6 @@ impl ShortDirEntry{
         } else {
             end = (offset + buf.len()).min(self.size as usize);
         }
-        //println!("current offset:{}; end = {}",offset, end);
-        //if current_off >= end {
-        //    return 0;
-        //}
-        //println!("in write_at first_cluster:{}",self.first_cluster());
-        // DEBUG: 如果一开始就不在第一个簇！！
-        /*
-        let mut current_cluster = fat_reader.get_cluster_at(
-            self.first_cluster(),
-            manager_reader.cluster_of_offset(offset) , 
-            Arc::clone(block_device)
-        );
-        //println!("in write_at curr_cluster:{}",current_cluster);
-        let mut current_sector = manager_reader.first_sector_of_cluster(current_cluster) + current_off / bytes_per_sector;
-        */
         let (c_clu, c_sec, _) = self.get_pos(
             offset, manager, 
             &manager_reader.get_fat(), 

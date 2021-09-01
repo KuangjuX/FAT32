@@ -165,6 +165,7 @@ impl FAT32Manager {
         // 保留扇区数 + 所有FAT表的扇区数
         let root_sec = boot_sec.table_count as u32 * fat_n_sec + boot_sec.reserved_sector_count as u32;
 
+        // 初始化root_dirent
         let mut root_dirent = ShortDirEntry::new(&[0x2F,0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20], &[0x20, 0x20, 0x20], ATTRIBUTE_DIRECTORY);
         root_dirent.set_first_cluster(2);
 
@@ -204,9 +205,9 @@ impl FAT32Manager {
     // TODO:分配的时候清零
     pub fn alloc_cluster(&self, num: u32)->Option<u32> {
         let free_clusters = self.free_clusters();
-        // if num > free_clusters {
-        //     return None
-        // }
+        if num > free_clusters {
+            return None
+        }
         // 获取FAT写锁
         let fat_writer = self.fat.write();
         let prev_cluster = self.fsinfo.first_free_cluster(self.block_device.clone());
@@ -292,7 +293,7 @@ impl FAT32Manager {
     }*/
 
     /* 计算扩大至new_size(B)需要多少个簇 */
-    pub fn cluster_num_needed(&self, old_size:u32, new_size:u32, is_dir: bool, first_cluster: u32)->u32{
+    pub fn cluster_num_needed(&self, old_size:u32, new_size:u32, is_dir: bool, first_cluster: u32)-> u32 {
         if old_size >= new_size {
             0
         }else{
