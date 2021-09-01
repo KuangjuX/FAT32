@@ -257,24 +257,24 @@ impl FSInfo{
 #[derive(Clone, Copy, Debug)]
 #[repr(packed)]
 #[allow(unused)]
-pub struct ShortDirEntry{
-    name: [u8;8],        // 删除时第0位为0xE5，未使用时为0x00. 有多余可以用0x20填充
-    extension: [u8;3],
-    attribute: u8,       //可以用于判断是目录还是文件
-    winnt_reserved: u8,
-    creation_tenths: u8, //精确到0.1s
-    creation_time: u16,
-    creation_date: u16,
-    last_acc_date: u16,
-    cluster_high: u16,
-    modification_time: u16,
-    modification_date: u16,
-    cluster_low: u16,
-    size: u32,
+pub struct ShortDirEntry {
+    pub name: [u8;8],        // 删除时第0位为0xE5，未使用时为0x00. 有多余可以用0x20填充
+    pub extension: [u8;3],
+    pub attribute: u8,       //可以用于判断是目录还是文件
+    pub winnt_reserved: u8,
+    pub creation_tenths: u8, //精确到0.1s
+    pub creation_time: u16,
+    pub creation_date: u16,
+    pub last_acc_date: u16,
+    pub cluster_high: u16,
+    pub modification_time: u16,
+    pub modification_date: u16,
+    pub cluster_low: u16,
+    pub size: u32,
 }
 
 impl ShortDirEntry{
-    pub fn empty()->Self{
+    pub fn empty() -> Self{
         Self{
             name: [0;8],        // 删除时第0位为0xE5，未使用时为0x00. 有多余可以用0x20填充
             extension: [0;3],
