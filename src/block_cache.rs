@@ -151,7 +151,7 @@ impl BlockCacheManager {
                 BlockCache::new(block_id, Arc::clone(&block_device))
             ));
             self.queue.push_back((block_id, Arc::clone(&block_cache)));
-            //println!("blkcache: {:?}", block_cache.read().cache);
+            // println!("blkcache: {:?}", block_cache.read().cache);
             block_cache
         }
     }

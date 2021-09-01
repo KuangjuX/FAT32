@@ -1,6 +1,10 @@
+
+
 //use core::fmt::{Debug, Formatter, Result};
 use super::{
     BLOCK_SZ,
+    SECTOR_SIZE,
+    FAT_SIZE,
     BlockDevice,
     get_info_cache,
     get_block_cache,
@@ -65,6 +69,31 @@ pub struct FatBS {
 }
 
 impl FatBS {
+    // 初始化BIOSParamterBlock
+    pub fn init_boot_sector(block_device: Arc<dyn BlockDevice>) {
+        let cache = get_info_cache(0, block_device, CacheMode::WRITE);
+        let mut guard = cache.write();
+        guard.modify(0, |fat_bs: &mut FatBS| {
+            *fat_bs = FatBS {
+                unused: [0u8; 11],
+                bytes_per_sector: BLOCK_SZ as u16,
+                sectors_per_cluster: 1,
+                reserved_sector_count: 2,
+                table_count: 2,
+                root_entry_count: 0,
+                total_sectors_16: 0,
+                media_type: 0, 
+                table_size_16: 0,
+                sectors_per_track: 0, 
+                head_side_count: 0, 
+                hidden_sector_count: 0, 
+                total_sectors_32: SECTOR_SIZE as u32
+            }
+        });
+        
+        drop(guard);
+    }
+
     pub fn total_sectors(&self) -> u32 {
         if self.total_sectors_16 == 0 {
             self.total_sectors_32
@@ -82,7 +111,7 @@ impl FatBS {
 #[repr(packed)]
 #[derive(Clone, Copy)]
 #[allow(unused)]
-pub struct FatExtBS{
+pub struct FatExtBS {
     table_size_32:u32,
     extended_flags:u16,   
     fat_version:u16,
@@ -96,6 +125,28 @@ pub struct FatExtBS{
 }
 
 impl FatExtBS{
+    /// 初始化FATEXTBS 
+    pub fn init_ext_bs(block_device: Arc<dyn BlockDevice>) {
+        let cache = get_info_cache(0, block_device, CacheMode::WRITE);
+        let mut guard = cache.write();
+        guard.modify(36, |fat_ext_bs: &mut FatExtBS| {
+            *fat_ext_bs = FatExtBS {
+                table_size_32: FAT_SIZE as u32,
+                extended_flags: 0,
+                fat_version: 0,
+                root_clusters: 2,
+                fat_info: 1,
+                backup_bs_sector: 0,
+                reserved_0: [0u8; 12],
+                drive_number: 0x80,
+                reserved_1: 0,
+                boot_signature: 0
+            };
+        });
+
+        drop(guard);
+    }
+
     // FAT占用的扇区数
     pub fn fat_size(&self) -> u32{
         self.table_size_32
@@ -111,17 +162,31 @@ impl FatExtBS{
     }
 }
 
-// 该结构体不对Buffer作结构映射，仅保留位置信息
-// 但是为其中信息的获取和修改提供了接口
+/// 该结构体不对Buffer作结构映射，仅保留位置信息
+/// 但是为其中信息的获取和修改提供了接口
 pub struct FSInfo{
     sector_num: u32,
 }
 
 impl FSInfo{
-    pub fn new(sector_num: u32)->Self {
+    pub fn new(sector_num: u32) -> Self {
         Self{
             sector_num
         }
+    }
+
+    /// 初始化FSInfo，并写入文件系统镜像
+    pub fn init_fsinfo(&self, block_device: Arc<dyn BlockDevice>) {
+        let cache = get_info_cache(self.sector_num as usize, block_device, CacheMode::WRITE);
+        let mut guard = cache.write();
+        // 初始化标准位
+        guard.modify(0, |leadsig: &mut u32| {
+            *leadsig = LEAD_SIGNATURE;
+        });
+        guard.modify(484, |sec_sig: &mut u32| {
+            *sec_sig = SECOND_SIGNATURE;
+        });
+        drop(guard);
     }
 
     fn check_lead_signature(&self, block_device: Arc<dyn BlockDevice>) -> bool {

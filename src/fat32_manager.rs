@@ -35,9 +35,32 @@ pub struct FAT32Manager {
 
 //type DataBlock = [u8; BLOCK_SZ];
 
-impl FAT32Manager {
-    pub fn create(block_device: Arc<dyn BlockDevice>) -> Arc<RwLock<Self>> {
+pub fn create_fat(block_id: usize, device: Arc<dyn BlockDevice>) {
+    let cache = get_info_cache(block_id,device, CacheMode::WRITE);
+    let mut guard = cache.write();
+    guard.modify(0, |fat: &mut u64| {
+        *fat = 0xFFFFFFFFFFFFFFFF;
+    });
+    guard.modify(8, |fat: &mut u32| {
+        *fat = 0x0FFFFFFF;
+    });
+    drop(guard);
+}
 
+
+impl FAT32Manager {
+    // 创建FAT32管理者
+    pub fn create(block_device: Arc<dyn BlockDevice>) -> Arc<RwLock<Self>> {
+        // 初始化文件系统镜像
+        FatBS::init_boot_sector(Arc::clone(&block_device));
+        FatExtBS::init_ext_bs(Arc::clone(&block_device));
+        // 初始化Fat表
+        // create_fat(1, Arc::clone(&block_device));
+        // 初始化FsInfo
+        let fs_info = FSInfo::new(1);
+        fs_info.init_fsinfo(Arc::clone(&block_device));
+        // 打开文件系统镜像
+        Self::open(Arc::clone(&block_device))
     }
 
     pub fn sectors_per_cluster(&self)->u32{
@@ -75,22 +98,22 @@ impl FAT32Manager {
     pub fn open(block_device: Arc<dyn BlockDevice>) -> Arc<RwLock<Self>>{
         // 读入分区偏移
         // println!("[fs]: Load FAT32");
-        let start_sector:u32 = get_info_cache(
-            0, 
-            Arc::clone(&block_device),
-            CacheMode::READ )
-        .read()
-        .read(0x1c6, |ssec_bytes:&[u8;4]|{
-            // DEBUG
-            let mut start_sec:u32 = 0;
-            for i in 0..4 {
-                let tmp = ssec_bytes[i] as u32;
-                start_sec = start_sec + (tmp << (8*i));
-                //println!("start sec = {}, buf = {}", start_sec , ssec_bytes[i])
-            }
-            start_sec
-        });
-        
+        // let start_sector:u32 = get_info_cache(
+        //     0, 
+        //     Arc::clone(&block_device),
+        //     CacheMode::READ )
+        // .read()
+        // .read(0x1c6, |ssec_bytes:&[u8;4]|{
+        //     // DEBUG
+        //     let mut start_sec:u32 = 0;
+        //     for i in 0..4 {
+        //         let tmp = ssec_bytes[i] as u32;
+        //         start_sec = start_sec + (tmp << (8*i));
+        //         //println!("start sec = {}, buf = {}", start_sec , ssec_bytes[i])
+        //     }
+        //     start_sec
+        // });
+        let start_sector = 0;
         set_start_sec(start_sector as usize);
         
         // 读入 Boot Sector
@@ -127,16 +150,18 @@ impl FAT32Manager {
         // println!("[fs]: bytes per sec = {}", bytes_per_sector);
         // println!("[fs]: bytes per cluster = {}", bytes_per_cluster);
 
+        // 读取FAT表信息
         let fat_n_sec = ext_boot_sec.fat_size();
         let fat1_sector = boot_sec.first_fat_sector();
         let fat2_sector = fat1_sector + fat_n_sec;
+        // 用来计算一共有多少entry
         let fat_n_entry = fat_n_sec * bytes_per_sector / 4;
 
         let fat = FAT::new(fat1_sector, fat2_sector, fat_n_sec, fat_n_entry);
         
         // println!("[fs]: chain of root dir: {:?}",fat.get_all_cluster_of(2, Arc::clone(&block_device)));
 
-        // 保留扇区数+所有FAT表的扇区数
+        // 保留扇区数 + 所有FAT表的扇区数
         let root_sec = boot_sec.table_count as u32 * fat_n_sec + boot_sec.reserved_sector_count as u32;
 
         let mut root_dirent = ShortDirEntry::new(&[0x2F,0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20], &[0x20, 0x20, 0x20], ATTRIBUTE_DIRECTORY);
