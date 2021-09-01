@@ -313,8 +313,6 @@ impl VFile{
         }
         let mut current_vfile = self.clone();
         for i in 0 .. len {
-            // DEBUG
-            // print!("\n");
             if path[i] == "" || path[i] == "."{
                 continue;
             }
@@ -325,12 +323,6 @@ impl VFile{
             }
         }
         Some(Arc::new(current_vfile))
-    }
-
-    /* WAITING 既然目录都没有大小，那暂时没必要做这个 */
-    #[allow(unused)]
-    fn decrease_size(){
-
     }
 
     fn increase_size(
@@ -406,10 +398,6 @@ impl VFile{
     pub fn create(& self, name: &str, attribute: u8) -> Option<Arc<VFile>> {
         // 检测同名文件
         assert!(self.is_dir());
-        //if self.find_vfile_byname(name).is_some() {  
-        //    //println!("already exist：{}",name);
-        //    return None
-        //}
         let manager_reader = self.fs.read();
         let (name_, ext_) = manager_reader.split_name_ext(name);
         // 搜索空处
@@ -642,8 +630,7 @@ impl VFile{
         })
     }
     
-    /* ls精简版，上面那个又臭又长，但这个不保证可靠 */
-    // DEBUG
+    
     pub fn ls_lite(&self)-> Option<Vec<(String, u8)>>{   
         if !self.is_dir() {
             return None
@@ -738,7 +725,7 @@ impl VFile{
     }
 
     /* 查找可用目录项，返回offset，簇不够也会返回相应的offset，caller需要及时分配 */
-    fn find_free_dirent(&self)->Option<usize>{
+    fn find_free_dirent(&self)->Option<usize> {
         if !self.is_dir() {
             return None
         }

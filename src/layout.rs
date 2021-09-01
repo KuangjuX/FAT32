@@ -274,10 +274,6 @@ pub struct ShortDirEntry{
 }
 
 impl ShortDirEntry{
-    /* K210上无法获取现实的时间，因此没有修改时间字段的必要 */
-
-    /* 建一个空的，一般读取时用到 */
-    // QUES 真的用得到？
     pub fn empty()->Self{
         Self{
             name: [0;8],        // 删除时第0位为0xE5，未使用时为0x00. 有多余可以用0x20填充
@@ -296,9 +292,8 @@ impl ShortDirEntry{
         }
     }
 
-    /* 创建文件时调用 
-    * 新建时不必分配块。写时检测初始簇是否为0，为0则需要分配。
-    */
+    /// 创建文件时调用 
+    /// 新建时不必分配块。写时检测初始簇是否为0，为0则需要分配
     pub fn new(
         name_: &[u8],        
         extension_: &[u8],
