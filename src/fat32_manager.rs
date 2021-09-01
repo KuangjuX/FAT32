@@ -10,14 +10,14 @@ use super::{
     FatBS, 
     FatExtBS,
     FAT,
-    // println,
+    println,
 };
 //#[macro_use]
-use crate::{ layout::*, VFile};
+use crate::{VFile, layout::*};
 use alloc::vec::Vec;
 use alloc::string::String;
 use spin::RwLock;
-//use console;
+// use console;
 
 pub struct FAT32Manager {
     block_device: Arc<dyn BlockDevice>,
@@ -137,18 +137,19 @@ impl FAT32Manager {
         .read(36, |ebs:&FatExtBS|{
             *ebs // DEBUG
         });
+        // println!("ext_boot_sec: {:?}", ext_boot_sec);
         // 读入 FSInfo
         let fsinfo = FSInfo::new(ext_boot_sec.fat_info_sec());
         // 校验签名
         assert!(fsinfo.check_signature(Arc::clone(&block_device)),"Error loading fat32! Illegal signature");
-        // println!("[fs]: first free cluster = {}", fsinfo.first_free_cluster(block_device.clone()) );
+        println!("[fs]: first free cluster = {}", fsinfo.first_free_cluster(block_device.clone()) );
         
         let sectors_per_cluster = boot_sec.sectors_per_cluster as u32;
         let bytes_per_sector = boot_sec.bytes_per_sector as u32;
         let bytes_per_cluster = sectors_per_cluster * bytes_per_sector;
 
-        // println!("[fs]: bytes per sec = {}", bytes_per_sector);
-        // println!("[fs]: bytes per cluster = {}", bytes_per_cluster);
+        println!("[fs]: bytes per sec = {}", bytes_per_sector);
+        println!("[fs]: bytes per cluster = {}", bytes_per_cluster);
 
         // 读取FAT表信息
         let fat_n_sec = ext_boot_sec.fat_size();
@@ -159,7 +160,7 @@ impl FAT32Manager {
 
         let fat = FAT::new(fat1_sector, fat2_sector, fat_n_sec, fat_n_entry);
         
-        // println!("[fs]: chain of root dir: {:?}",fat.get_all_cluster_of(2, Arc::clone(&block_device)));
+        println!("[fs]: chain of root dir: {:?}",fat.get_all_cluster_of(2, Arc::clone(&block_device)));
 
         // 保留扇区数 + 所有FAT表的扇区数
         let root_sec = boot_sec.table_count as u32 * fat_n_sec + boot_sec.reserved_sector_count as u32;

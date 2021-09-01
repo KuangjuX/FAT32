@@ -1,5 +1,8 @@
 
 
+// use crate::println;
+use crate::utils::{bytes_order_u16, bytes_order_u32};
+
 //use core::fmt::{Debug, Formatter, Result};
 use super::{
     BLOCK_SZ,
@@ -18,8 +21,8 @@ use alloc::vec::Vec;
 use spin::RwLock;
 //use riscv::interrupt::free;
 
-const LEAD_SIGNATURE:u32 = 0x41615252;
-const SECOND_SIGNATURE:u32 = 0x61417272;
+pub const LEAD_SIGNATURE:u32 = 0x41615252;
+pub const SECOND_SIGNATURE:u32 = 0x61417272;
 pub const FREE_CLUSTER:u32 = 0x00000000;
 pub const END_CLUSTER:u32  = 0x0FFFFFF8;
 pub const BAD_CLUSTER:u32  = 0x0FFFFFF7;
@@ -109,19 +112,19 @@ impl FatBS {
 }
 
 #[repr(packed)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[allow(unused)]
 pub struct FatExtBS {
-    table_size_32:u32,
-    extended_flags:u16,   
-    fat_version:u16,
-    root_clusters:u32,   
-    fat_info:u16,
-    backup_bs_sector:u16,
-    reserved_0:[u8;12],
-    drive_number:u8,
-    reserved_1:u8,
-    boot_signature:u8,  //0x28 or 0x29
+    pub table_size_32:u32,
+    pub extended_flags:u16,   
+    pub fat_version:u16,
+    pub root_clusters:u32,   
+    pub fat_info:u16,
+    pub backup_bs_sector:u16,
+    pub reserved_0:[u8;12],
+    pub drive_number:u8,
+    pub reserved_1:u8,
+    pub boot_signature:u8,  //0x28 or 0x29
 }
 
 impl FatExtBS{
@@ -181,10 +184,10 @@ impl FSInfo{
         let mut guard = cache.write();
         // 初始化标准位
         guard.modify(0, |leadsig: &mut u32| {
-            *leadsig = LEAD_SIGNATURE;
+            *leadsig = bytes_order_u32(LEAD_SIGNATURE);
         });
         guard.modify(484, |sec_sig: &mut u32| {
-            *sec_sig = SECOND_SIGNATURE;
+            *sec_sig = bytes_order_u32(SECOND_SIGNATURE);
         });
         drop(guard);
     }
@@ -193,6 +196,7 @@ impl FSInfo{
         get_info_cache(self.sector_num as usize, block_device, CacheMode::READ)
         .read()
         .read(0,|&lead_sig: &u32|{
+            // println!("lead_sig: 0x{:x}", lead_sig);
             lead_sig == LEAD_SIGNATURE
         })
     }
@@ -201,6 +205,7 @@ impl FSInfo{
         get_info_cache(self.sector_num as usize, block_device, CacheMode::READ)
         .read()
         .read(484,|&sec_sig: &u32|{
+            // println!("sec_sig: 0x{:x}", sec_sig);
             sec_sig == SECOND_SIGNATURE
         })
     }

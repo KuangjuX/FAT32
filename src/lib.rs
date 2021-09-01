@@ -17,6 +17,7 @@ mod layout;
 mod fat32_manager;
 mod vfs;
 mod block_cache;
+mod utils;
 #[macro_use]
 mod console;
 mod sbi;
