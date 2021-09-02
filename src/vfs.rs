@@ -4,7 +4,7 @@ use super::{
     layout::*,
     get_info_cache,
     CacheMode,
-    // println,
+    println,
     // print
 };
 use alloc::sync::Arc;
@@ -114,7 +114,7 @@ impl VFile{
         ).write().modify(offset, f)
     }
 
-    pub fn modify_short_dirent<V>(&self, f: impl FnOnce(&mut ShortDirEntry) -> V)->V{
+    pub fn modify_short_dirent<V>(&self, f: impl FnOnce(&mut ShortDirEntry) -> V) -> V {
         if self.short_sector == 0 {
             //println!("[fs]: modify vroot dent");
             let root_dirent = self.fs.read().get_root_dirent();
@@ -239,6 +239,7 @@ impl VFile{
         }
     }
 
+    /// 查找短文件名目录
     fn find_short_name(
         &self, 
         name:&str, 
@@ -256,7 +257,9 @@ impl VFile{
                 &self.fs.read().get_fat(), 
                 &self.block_device
             );
-            if read_sz != DIRENT_SZ || short_ent.is_empty() {
+            // println!("short_ent.name: {:?}", short_ent.name);
+            if read_sz 
+            != DIRENT_SZ || short_ent.is_empty() {
                 return None
             }else{
                 if short_ent.is_valid() && name_upper == short_ent.get_name_uppercase() {
@@ -282,12 +285,13 @@ impl VFile{
         }
     }
 
-    /* 根据名称搜索当前目录下的文件 */
+    /// 根据名称搜索当前目录下的文件
     pub fn find_vfile_byname(
         &self,
         name: &str,
     ) -> Option<VFile> { 
         assert!( self.is_dir() );
+        // 将文件名和扩展分开
         let mut name_and_ext: Vec<&str> = name.split(".").collect();
         let name_ = name_and_ext[0].as_bytes();
         if name_and_ext.len() == 1 {
@@ -296,24 +300,28 @@ impl VFile{
         let ext_ = name_and_ext[1].as_bytes();
         // FAT32目录没有大小，只能搜，read_at已经做了完善的适配
         self.read_short_dirent(|short_ent:&ShortDirEntry|{
-            if name_.len() > 8 || ext_.len() > 3 { //长文件名
+            if name_.len() > 8 || ext_.len() > 3 { 
+                //长文件名
                 return self.find_long_name(name, short_ent)
-            } else { // 短文件名
+            } else { 
+                // 短文件名
                 return self.find_short_name(name, short_ent) 
             }
         })
     }
     
-    /* 根据路径递归搜索文件 */
+    /// 根据路径递归搜索文件
     pub fn find_vfile_bypath(&self, path: Vec<&str>)-> Option<Arc<VFile>>{
         let _ = self.fs.read(); // 获取读锁
         let len = path.len();
-        if len == 0{
+        if len == 0 {
+            // 如果长度为0，则返回自己
             return Some( Arc::new(self.clone()) );
         }
         let mut current_vfile = self.clone();
         for i in 0 .. len {
-            if path[i] == "" || path[i] == "."{
+            if path[i] == "" || path[i] == "." {
+                // 跳过，表示仍然为当前目录
                 continue;
             }
             if let Some(vfile) = current_vfile.find_vfile_byname(path[i]) {
@@ -393,8 +401,8 @@ impl VFile{
         });
     }*/
 
-    /* 在当前目录下创建文件 */ 
-    pub fn create(& self, name: &str, attribute: u8) -> Option<Arc<VFile>> {
+    /// 在当前目录下创建文件
+    pub fn create(&self, name: &str, attribute: u8) -> Option<Arc<VFile>> {
         // 检测同名文件
         assert!(self.is_dir());
         let manager_reader = self.fs.read();
@@ -689,6 +697,7 @@ impl VFile{
 
     pub fn write_at(&self, offset: usize, buf: & [u8]) -> usize {
         self.increase_size((offset + buf.len()) as u32  );
+        // 写入短目录
         self.modify_short_dirent(|short_ent: &mut ShortDirEntry| {
             short_ent.write_at(
                 offset, 
@@ -723,17 +732,18 @@ impl VFile{
         fs_reader.cache_write_back();
     }
 
-    /* 查找可用目录项，返回offset，簇不够也会返回相应的offset，caller需要及时分配 */
+    /// 查找可用目录项，返回offset，簇不够也会返回相应的offset，caller需要及时分配
     fn find_free_dirent(&self)->Option<usize> {
         if !self.is_dir() {
             return None
         }
         let mut offset = 0;
         loop {
-            if (offset/DIRENT_SZ)%5 == 0 {
+            if (offset / DIRENT_SZ) % 5 == 0 {
                 // print!("\n");
             }
             let mut tmp_dirent = ShortDirEntry::empty();
+            // 读取短目录项
             let read_sz = self.read_short_dirent(|short_ent:&ShortDirEntry|{
                 short_ent.read_at(
                     offset, 
@@ -743,7 +753,8 @@ impl VFile{
                     &self.block_device
                 )
             });
-            if tmp_dirent.is_empty() || read_sz == 0{
+            // 判断短目录项是否为空
+            if tmp_dirent.is_empty() || read_sz == 0 {
                 return Some(offset)
             }
             offset += DIRENT_SZ;

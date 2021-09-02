@@ -14,6 +14,7 @@ use super::{
     fat32_manager::FAT32Manager,
     CacheMode,
     clone_into_array,
+    println
 };
 use alloc::sync::Arc;
 use alloc::string::String;
@@ -562,7 +563,7 @@ impl ShortDirEntry{
         (current_cluster, current_sector, offset % bytes_per_sector)
     }   
 
-    /* 以偏移量读取文件，这里会对fat和manager加读锁 */
+    /// 以偏移量读取文件，这里会对fat和manager加读锁
     pub fn read_at(
         &self,
         offset: usize,
@@ -571,26 +572,26 @@ impl ShortDirEntry{
         fat: &Arc<RwLock<FAT>>,
         block_device: &Arc<dyn BlockDevice>,
     ) -> usize {
-        //println!("========================================================\nin read_at self.first_cluster={}", self.first_cluster());
+        println!("========================================================\nin read_at self.first_cluster={}", self.first_cluster());
         // 获取共享锁
         let manager_reader = manager.read();
         let fat_reader = fat.read();
         let bytes_per_sector = manager_reader.bytes_per_sector() as usize;
         let bytes_per_cluster = manager_reader.bytes_per_cluster() as usize;
         let mut current_off = offset;
-        //println!("size = {}",self.size);
+        println!("size = {}", self.size);
         let end:usize;
         if self.is_dir() {
             let size =  bytes_per_cluster * fat_reader.count_claster_num(self.first_cluster() as u32, block_device.clone()) as usize;
-            end = offset + buf.len().min(size );// DEBUG:约束上界
+            end = offset + buf.len().min(size);// DEBUG:约束上界
         } else {
             end = (offset + buf.len()).min(self.size as usize);
         }
-        //println!("in read_at offset ={}; end={}",current_off, end);
+        println!("in read_at offset ={}; end={}",current_off, end);
         if current_off >= end {
             return 0;
         }
-        //println!("first cluster = {}",self.first_cluster());
+        println!("first cluster = {}",self.first_cluster());
         // DEBUG: 如果一开始就不在第一个簇，如果buffer不大，会多次进入函数，这里可能会有问题
         // let cluster_index = manager_reader.cluster_of_offset(offset);
         let (c_clu, c_sec, _) = self.get_pos(
@@ -598,21 +599,10 @@ impl ShortDirEntry{
             &manager_reader.get_fat(), 
             block_device
         );
-        //println!("curr_clu = {} sec = {}", c_clu, c_sec);
+        println!("curr_clu = {} sec = {}", c_clu, c_sec);
         if c_clu >= END_CLUSTER {return 0};
         let mut current_cluster = c_clu;
         let mut current_sector = c_sec;
-        /*
-        let mut current_cluster = fat_reader.get_cluster_at(
-            self.first_cluster(),
-            manager_reader.cluster_of_offset(offset) , 
-            Arc::clone(block_device)
-        );
-        println!("in read_at, after get_cluster_at, current_cluster = {}", current_cluster);
-        //这里出了问题！！！
-        let mut current_sector = manager_reader.first_sector_of_cluster(current_cluster) + current_off / bytes_per_sector;
-        println!("in read_at current_sector={}", current_sector);
-        */
         
         let mut read_size = 0usize;
         loop {
