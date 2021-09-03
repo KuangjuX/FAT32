@@ -76,8 +76,8 @@ impl FAT32Manager {
     }
 
 
-    /* 第一个数据簇（ROOT）的扇区 */
-    pub fn first_data_sector(&self)->u32{
+    /// 第一个数据簇的扇区
+    pub fn first_data_sector(&self) -> u32{
         //first_data_sector = fat_boot->reserved_sector_count + (fat_boot->table_count * fat_size) ;
         self.root_sec
     }

@@ -24,8 +24,8 @@ mod sbi;
 
 pub const BLOCK_SZ: usize = 512;
 pub const SECTOR_SIZE: usize = 8192;
-pub const FAT_SIZE: usize = 4;
-pub const DATA_SIZE: usize = 8170;
+pub const FAT_SIZE: usize = 400;
+pub const DATA_SIZE: usize = 7390;
 
 pub const FIRST_FAT_SEC: usize = 2;
 

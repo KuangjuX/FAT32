@@ -4,7 +4,7 @@ use super::{
     layout::*,
     get_info_cache,
     CacheMode,
-    println,
+    // println,
     // print
 };
 use alloc::sync::Arc;
@@ -15,12 +15,12 @@ use spin::RwLock;
 
 #[derive(Clone)]
 pub struct VFile {
-    name:String,
-    short_sector: usize, 
-    short_offset: usize, //文件短目录项所在扇区和偏移
-    long_pos_vec: Vec<(usize, usize)>, // 长目录项的位置<sector, offset>
+    pub name:String,
+    pub short_sector: usize, 
+    pub short_offset: usize, //文件短目录项所在扇区和偏移
+    pub long_pos_vec: Vec<(usize, usize)>, // 长目录项的位置<sector, offset>
     //first_cluster: u32,
-    attribute:u8,
+    pub attribute:u8,
     //size:u32,
     fs: Arc<RwLock<FAT32Manager>>,
     block_device: Arc<dyn BlockDevice>,
@@ -75,7 +75,7 @@ impl VFile{
         self.fs.clone()
     }
 
-    pub fn is_dir(&self)->bool{
+    pub fn is_dir(&self) -> bool {
         if 0 != (self.attribute & ATTRIBUTE_DIRECTORY) {
             true
         }else{
@@ -83,7 +83,7 @@ impl VFile{
         }
     }
 
-    pub fn is_short(&self)->bool {
+    pub fn is_short(&self) -> bool {
         if self.long_pos_vec.len() == 0 {
             true
         } else {
@@ -403,11 +403,12 @@ impl VFile{
 
     /// 在当前目录下创建文件
     pub fn create(&self, name: &str, attribute: u8) -> Option<Arc<VFile>> {
-        // 检测同名文件
+        // 检测同名文件, 此时应在根目录下
         assert!(self.is_dir());
         let manager_reader = self.fs.read();
         let (name_, ext_) = manager_reader.split_name_ext(name);
         // 搜索空处
+        // 此时若不是目录文件，则返回为None
         let mut dirent_offset:usize;
         if let Some(offset) = self.find_free_dirent(){
             dirent_offset = offset;
@@ -425,7 +426,6 @@ impl VFile{
             let (name_bytes, ext_bytes) = manager_reader.short_name_format(short_name.as_str());
             short_ent.initialize(&name_bytes, &ext_bytes, attribute);
             let check_sum = short_ent.checksum();
-            //println!("*** aft checksum");
             drop(manager_reader);
             // 写长名目录项
             for i in 0..long_ent_num {
@@ -444,7 +444,8 @@ impl VFile{
                 );
                 dirent_offset += DIRENT_SZ;
             }
-        } else { // 短文件名格式化
+        } else { 
+            // 短文件名格式化
             let (name_bytes, ext_bytes) = manager_reader.short_name_format(name);
             short_ent.initialize(&name_bytes, &ext_bytes, attribute);
             short_ent.set_case(ALL_LOWER_CASE);
@@ -734,6 +735,7 @@ impl VFile{
 
     /// 查找可用目录项，返回offset，簇不够也会返回相应的offset，caller需要及时分配
     fn find_free_dirent(&self)->Option<usize> {
+        // 不是目录项，返回空
         if !self.is_dir() {
             return None
         }
