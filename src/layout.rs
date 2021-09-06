@@ -659,7 +659,7 @@ impl ShortDirEntry{
         read_size
     }
 
-    /* 以偏移量写文件，这里会对fat和manager加读锁 */
+    /// 以偏移量写文件，这里会对fat和manager加读锁
     pub fn write_at(
         &self,
         offset: usize,
@@ -668,7 +668,6 @@ impl ShortDirEntry{
         fat: &Arc<RwLock<FAT>>,
         block_device: &Arc<dyn BlockDevice>,
     ) -> usize {
-        //println!("in w_short");
         // 获取共享锁
         let manager_reader = manager.read();
         let fat_reader = fat.read();
@@ -680,6 +679,7 @@ impl ShortDirEntry{
             let size =  bytes_per_cluster * fat_reader.count_claster_num(self.first_cluster() as u32, block_device.clone()) as usize;
             end = offset + buf.len().min(size );// DEBUG:约束上界
         } else {
+            // 从偏移量/缓冲区长度之和和设定的size中取最小值
             end = (offset + buf.len()).min(self.size as usize);
         }
         let (c_clu, c_sec, _) = self.get_pos(
@@ -687,21 +687,23 @@ impl ShortDirEntry{
             &manager_reader.get_fat(), 
             block_device
         );
+        // 找到当前的cluster和sector，我们这里应该是一样的
         let mut current_cluster = c_clu;
         let mut current_sector = c_sec;
         let mut write_size = 0usize;
-        //println!("in write_at curr_sec:{}",current_sector);
+        // println!("in write_at curr_sec:{}",current_sector);
         
         loop {
-            // 将偏移量向上对齐扇区大小（一般是512
+            // 将偏移量向上对齐扇区大小(一般是512)
             let mut end_current_block = (current_off / bytes_per_sector + 1) * bytes_per_sector;
             end_current_block = end_current_block.min(end);
 
             // 写
             let block_write_size = end_current_block - current_off;
-            //println!("write cache: current_sector = {}", current_sector);
+            // println!("write cache: current_sector = {}", current_sector);
             if self.is_dir() {
-                get_info_cache(  // 目录项通过infocache访问
+                get_info_cache(  
+                    // 目录项通过infocache访问
                     current_sector,
                     Arc::clone(block_device),
                     CacheMode::READ,
@@ -732,13 +734,17 @@ impl ShortDirEntry{
             current_off = end_current_block;
             if current_off % bytes_per_cluster == 0 {
                 // 读完一个簇
-                //println!("finish writing a cluster");
+                // println!("finish writing a cluster");
+                
+                // 查询下一个簇
                 current_cluster = fat_reader.get_next_cluster(current_cluster, Arc::clone(block_device));
-                if current_cluster >= END_CLUSTER { panic!("END_CLUSTER"); break; } //没有下一个簇
+                if current_cluster >= END_CLUSTER { panic!("END_CLUSTER"); } //没有下一个簇
                 // 计算所在扇区
-                //println!("write at current_cluster = {}", current_cluster);
+                // println!("write at current_cluster = {}", current_cluster);
+
+                // 获取下一个簇的第一个扇区
                 current_sector = manager_reader.first_sector_of_cluster(current_cluster);
-                //println!("write at current_sector = {}", current_sector);
+                // println!("write at current_sector = {}", current_sector);
                 //let mut guess = String::new();
                 //std::io::stdin().read_line(&mut guess).expect("Failed to read line");
             } else {
@@ -984,7 +990,7 @@ pub struct FAT{
     n_entry: u32,     //表项数量 
 }
 
-// TODO: 防越界处理（虽然可能这辈子都遇不到）
+
 impl FAT{
     pub fn new(fat1_sector:u32, fat2_sector:u32, n_sectors: u32, n_entry:u32)->Self{
         Self{
@@ -1033,7 +1039,7 @@ impl FAT{
         curr_cluster & 0x0FFFFFFF
     }
 
-    /* 查询当前簇的下一个簇 */
+    /// 查询当前簇的下一个簇
     pub fn get_next_cluster(&self, cluster: u32, block_device: Arc<dyn BlockDevice>) -> u32{
         // 需要对损坏簇作出判断
         // 及时使用备用表

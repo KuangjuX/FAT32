@@ -75,7 +75,6 @@ impl FAT32Manager {
         self.bytes_per_cluster
     }
 
-
     /// 第一个数据簇的扇区
     pub fn first_data_sector(&self) -> u32{
         //first_data_sector = fat_boot->reserved_sector_count + (fat_boot->table_count * fat_size) ;

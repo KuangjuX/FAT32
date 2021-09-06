@@ -145,7 +145,7 @@ impl VFile{
         &self, 
         name: &str,
         dir_ent: &ShortDirEntry
-    )->Option<VFile>{
+    ) -> Option<VFile> {
         let name_vec = self.fs.read().long_name_split(name);
         let mut offset:usize = 0;
         let mut long_ent = LongDirEntry::empty();
@@ -338,9 +338,9 @@ impl VFile{
         new_size: u32,
     ) {  
         // TODO: return sth when cannot increase
-        //println!("===================== in increase =======================");
-        //println!("file: {}, newsz = {}", self.get_name(), new_size);
-        //println!("try lock");
+        // println!("===================== in increase =======================");
+        // println!("file: {}, newsz = {}", self.get_name(), new_size);
+        // println!("try lock");
         let first_cluster = self.first_cluster();
         let old_size = self.get_size();
         let manager_writer = self.fs.write();
@@ -359,7 +359,7 @@ impl VFile{
             return;
         }   
         
-        //println!("first cluster = {} nxt = {}", first_cluster, manager_writer.get_fat().read().get_next_cluster(first_cluster, self.block_device.clone()));
+        // println!("first cluster = {} nxt = {}", first_cluster, manager_writer.get_fat().read().get_next_cluster(first_cluster, self.block_device.clone()));
         if let Some(cluster) = manager_writer.alloc_cluster(needed) {
             //println!("*** cluster alloc = {}",cluster);
             if first_cluster == 0 { //未分配簇
@@ -367,12 +367,12 @@ impl VFile{
                 self.modify_short_dirent(|se:&mut ShortDirEntry|{
                     se.set_first_cluster(cluster);
                 });
-                //println!("fc = {}",self.first_cluster());
-                //println!("================== increase end ====================");
+                // println!("fc = {}",self.first_cluster());
+                // println!("================== increase end ====================");
             }else{  // 已经分配簇
                 //let fs_reader = self.fs.read();
-                //println!("[fs-inc]: file: {}, newsz = {}", self.get_name(), new_size);
-                //println!("  cluster alloc = {}",cluster);
+                // println!("[fs-inc]: file: {}, newsz = {}", self.get_name(), new_size);
+                // println!("  cluster alloc = {}",cluster);
                 let fat = manager_writer.get_fat();
                 //println!("try lock1");
                 let fat_writer = fat.write();
@@ -381,7 +381,7 @@ impl VFile{
                 assert_ne!( cluster, 0);
                 fat_writer.set_next_cluster(final_cluster, cluster, self.block_device.clone());
                 //let allc = fat_writer.get_all_cluster_of(first_cluster, self.block_device.clone());
-                //println!("  finish set next cluster, cluster chain:{:?}", allc);
+                // println!("  finish set next cluster, cluster chain:{:?}", allc);
                 drop(manager_writer);
             }
             //self.size = new_size;
@@ -439,6 +439,7 @@ impl VFile{
                     check_sum
                 );
                 assert_eq!(
+                    // 写长目录项
                     self.write_at(dirent_offset, long_ent.as_bytes_mut()),
                     DIRENT_SZ
                 );
@@ -459,7 +460,7 @@ impl VFile{
         
         // 如果是目录类型，需要创建.和..
 
-        if let Some(vfile) = self.find_vfile_byname(name){
+        if let Some(vfile) = self.find_vfile_byname(name) {
             if attribute & ATTRIBUTE_DIRECTORY != 0 {
                 let manager_reader = self.fs.read();
                 let (name_bytes,ext_bytes) = manager_reader.short_name_format(".");
@@ -639,7 +640,7 @@ impl VFile{
     }
     
     
-    pub fn ls_lite(&self)-> Option<Vec<(String, u8)>>{   
+    pub fn ls_lite(&self)-> Option<Vec<(String, u8)>> {   
         if !self.is_dir() {
             return None
         } 
@@ -696,10 +697,12 @@ impl VFile{
         })
     }   
 
+    /// 写入文件的具体内容
     pub fn write_at(&self, offset: usize, buf: & [u8]) -> usize {
         self.increase_size((offset + buf.len()) as u32  );
         // 写入短目录
         self.modify_short_dirent(|short_ent: &mut ShortDirEntry| {
+            // 写入短目录的数据
             short_ent.write_at(
                 offset, 
                 buf, 
