@@ -1,13 +1,6 @@
 use super::{
-    clone_into_array,
-    fat32_manager::FAT32Manager,
-    get_block_cache,
-    get_info_cache,
-    BlockDevice,
-    CacheMode,
-    BLOCK_SZ,
-    FAT_SIZE,
-    SECTOR_SIZE,
+    clone_into_array, fat32_manager::FAT32Manager, get_block_cache, get_info_cache, BlockDevice,
+    CacheMode, BLOCK_SZ, FAT_SIZE, SECTOR_SIZE,
 };
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -98,7 +91,7 @@ impl FatBS {
         }
     }
 
-    /*第一个FAT表所在的扇区*/
+    /// 第一个FAT表所在的扇区
     pub fn first_fat_sector(&self) -> u32 {
         self.reserved_sector_count as u32
     }
@@ -143,7 +136,7 @@ impl FatExtBS {
     //     drop(guard);
     // }
 
-    // FAT占用的扇区数
+    /// FAT占用的扇区数
     pub fn fat_size(&self) -> u32 {
         self.table_size_32
     }
@@ -186,17 +179,13 @@ impl FSInfo {
     fn check_lead_signature(&self, block_device: Arc<dyn BlockDevice>) -> bool {
         get_info_cache(self.sector_num as usize, block_device, CacheMode::READ)
             .read()
-            .read(0, |&lead_sig: &u32| {
-                lead_sig == LEAD_SIGNATURE
-            })
+            .read(0, |&lead_sig: &u32| lead_sig == LEAD_SIGNATURE)
     }
 
     fn check_another_signature(&self, block_device: Arc<dyn BlockDevice>) -> bool {
         get_info_cache(self.sector_num as usize, block_device, CacheMode::READ)
             .read()
-            .read(484, |&sec_sig: &u32| {
-                sec_sig == SECOND_SIGNATURE
-            })
+            .read(484, |&sec_sig: &u32| sec_sig == SECOND_SIGNATURE)
     }
 
     /// 对签名进行校验
@@ -504,7 +493,6 @@ impl ShortDirEntry {
     pub fn set_case(&mut self, case: u8) {
         self.winnt_reserved = case;
     }
-
 
     /// 设置文件起始簇
     pub fn set_first_cluster(&mut self, cluster: u32) {

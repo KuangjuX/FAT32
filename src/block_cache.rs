@@ -19,10 +19,7 @@ impl BlockCache {
     /// Load a new BlockCache from disk.
     pub fn new(block_id: usize, block_device: Arc<dyn BlockDevice>) -> Self {
         let mut cache = [0u8; BLOCK_SZ];
-        //println!("cache new: blk_id = {}", block_id);
         block_device.read_block(block_id, &mut cache);
-        // TODO: 时间戳
-        //let mut time_stamp = time::read();
         let time_stamp = 0;
         Self {
             cache,
@@ -68,7 +65,6 @@ impl BlockCache {
 
     pub fn sync(&mut self) {
         if self.modified {
-            //println!("drop cache, id = {}", self.block_id);
             self.modified = false;
             self.block_device.write_block(self.block_id, &self.cache);
         }
@@ -88,7 +84,6 @@ impl Drop for BlockCache {
 // 8-19 DATA
 
 const BLOCK_CACHE_SIZE: usize = 10;
-//const DIRENT_CACHE_SIZE: usize = 4;
 pub struct BlockCacheManager {
     start_sec: usize,
     queue: VecDeque<(usize, Arc<RwLock<BlockCache>>)>,
@@ -146,7 +141,6 @@ impl BlockCacheManager {
                 Arc::clone(&block_device),
             )));
             self.queue.push_back((block_id, Arc::clone(&block_cache)));
-            // println!("blkcache: {:?}", block_cache.read().cache);
             block_cache
         }
     }
@@ -172,7 +166,6 @@ pub enum CacheMode {
     WRITE,
 }
 
-/* 仅用于访问文件数据块，不包括目录项 */
 pub fn get_block_cache(
     block_id: usize,
     block_device: Arc<dyn BlockDevice>,
@@ -195,7 +188,6 @@ pub fn get_block_cache(
     }
 }
 
-/* 用于访问保留扇区，以及目录项 */
 pub fn get_info_cache(
     block_id: usize,
     block_device: Arc<dyn BlockDevice>,
@@ -227,30 +219,3 @@ pub fn write_to_dev() {
     INFO_CACHE_MANAGER.write().drop_all();
     DATA_BLOCK_CACHE_MANAGER.write().drop_all();
 }
-
-/*
-pub fn get_dirent_block_cache(
-    block_id: usize,
-    block_device: Arc<dyn BlockDevice>
-) -> Arc<Mutex<BlockCache>> {
-    DATA_BLOCK_CACHE_MANAGER.lock().get_block_cache(block_id, block_device)
-}
-*/
-
-/*
-enum CacheType {
-    INFO,
-    FAT1,
-    FAT2,
-    DIRENT,
-    DATA,
-}
-fn type_to_range(type_: CacheType)->Range<usize>{
-    match type_ {
-        CacheType::INFO => {0..1}
-        CacheType::FAT1 => {1..3}
-        CacheType::FAT2 => {3..5}
-        CacheType::DIRENT => {5..8}
-        CacheType::DATA => {8..19}
-    }
-}*/
